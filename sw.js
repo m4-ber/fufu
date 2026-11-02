@@ -1,5 +1,5 @@
-// 离线缓存：首次访问后即可断网使用
-var CACHE = 'daily-quest-v2';
+// 离线缓存 v3：页面导航优先联网（更新即时生效），静态资源缓存优先 + 后台更新
+var CACHE = 'daily-quest-v3';
 var ASSETS = ['./', './index.html', './apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
@@ -29,10 +29,28 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;
 
+  // 页面请求：先联网拿最新，断网才回退缓存
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).then(function (resp) {
+        if (resp && resp.ok) {
+          var copy = resp.clone();
+          caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+        }
+        return resp;
+      }).catch(function () {
+        return caches.match(e.request).then(function (r) {
+          return r || caches.match('./index.html');
+        });
+      })
+    );
+    return;
+  }
+
+  // 静态资源：缓存优先，后台静默更新
   e.respondWith(
     caches.match(e.request).then(function (hit) {
       if (hit) {
-        // 后台静默更新，下次打开生效
         fetch(e.request).then(function (resp) {
           if (resp && resp.ok) {
             caches.open(CACHE).then(function (c) { c.put(e.request, resp.clone()); });
@@ -46,8 +64,6 @@ self.addEventListener('fetch', function (e) {
           caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
         }
         return resp;
-      }).catch(function () {
-        if (e.request.mode === 'navigate') return caches.match('./index.html');
       });
     })
   );

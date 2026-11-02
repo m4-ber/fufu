@@ -568,7 +568,11 @@ main{
       li0.textContent = '还没有任务';
       ul.appendChild(li0);
     } else {
-      items.forEach(function (t, i) {
+      // 未完成的排前面，已完成的沉底，各自保持原有顺序
+      var shown = items.map(function (t, i) { return { t: t, i: i }; });
+      shown.sort(function (a, b) { return (a.t.done ? 1 : 0) - (b.t.done ? 1 : 0); });
+      shown.forEach(function (o) {
+        var t = o.t, i = o.i;
         var li = document.createElement('li');
         li.className = 'task' + (t.done ? ' done' : '');
 
