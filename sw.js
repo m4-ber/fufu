@@ -1,5 +1,5 @@
 // 离线缓存 v3：页面导航优先联网（更新即时生效），静态资源缓存优先 + 后台更新
-var CACHE = 'daily-quest-v3';
+var CACHE = 'daily-quest-v4';
 var ASSETS = ['./', './index.html', './apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {

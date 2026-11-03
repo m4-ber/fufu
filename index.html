@@ -242,6 +242,77 @@ main{
   background:none;border:none;color:var(--muted);font-size:18px;
   cursor:pointer;padding:4px 6px;line-height:1;font-family:inherit;flex-shrink:0;
 }
+
+/* 长按操作菜单 */
+.sheet-mask,.modal-mask{
+  position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;
+  opacity:0;pointer-events:none;transition:opacity .2s ease;
+}
+.sheet-mask.show,.modal-mask.show{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));
+  z-index:31;margin:0 auto;max-width:456px;background:var(--card);
+  border:1px solid var(--line);border-radius:18px;padding:8px;
+  transform:translateY(24px);opacity:0;pointer-events:none;
+  transition:transform .22s ease,opacity .22s ease;
+}
+.sheet.show{transform:none;opacity:1;pointer-events:auto}
+.sheet .sheet-title{
+  font-size:12px;color:var(--muted);padding:10px 14px 6px;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sheet button{
+  display:block;width:100%;padding:14px;background:none;border:none;border-radius:12px;
+  color:var(--text);font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;text-align:left;
+}
+.sheet button:active{background:rgba(255,255,255,.06)}
+.sheet hr{border:none;border-top:1px solid var(--line);margin:4px 8px}
+.sheet .muted{color:var(--muted)}
+
+/* 日期编辑弹层 */
+.modal{
+  position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 16px);
+  bottom:calc(12px + env(safe-area-inset-bottom));z-index:31;margin:0 auto;max-width:456px;
+  background:var(--bg);border:1px solid var(--line);border-radius:20px;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 14px 24px;
+  transform:translateY(24px);opacity:0;pointer-events:none;
+  transition:transform .25s ease,opacity .25s ease;
+}
+.modal.show{transform:none;opacity:1;pointer-events:auto}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;
+  position:sticky;top:-16px;background:var(--bg);padding:4px 0;z-index:2;
+}
+.modal-title{font-size:17px;font-weight:700}
+.modal-close,.sort-banner button{
+  background:var(--accent);color:#07130b;border:none;border-radius:10px;
+  padding:8px 16px;font-weight:700;font-family:inherit;font-size:13px;cursor:pointer;
+}
+
+/* 排序模式 */
+.sort-banner{
+  position:fixed;top:0;left:0;right:0;z-index:25;display:flex;align-items:center;gap:10px;
+  padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  background:rgba(74,222,128,.15);border-bottom:1px solid rgba(74,222,128,.35);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  transform:translateY(-110%);transition:transform .25s ease;
+}
+.sort-banner.show{transform:none}
+.sort-banner span{flex:1;font-size:13px;color:var(--text);font-weight:600}
+body.sorting .task{touch-action:none;cursor:grab}
+body.sorting .check,body.sorting .del,body.sorting .task-text,
+body.sorting .add-row,body.sorting .tabbar{pointer-events:none}
+body.sorting .tabbar{opacity:.45}
+.task.dragging{
+  opacity:.94;border-color:var(--cat-color);z-index:5;position:relative;
+  box-shadow:0 10px 28px rgba(0,0,0,.5);transition:none;
+}
+.task{-webkit-touch-callout:none}
+
+/* 周报可点日期 */
+.wday.pickable{cursor:pointer}
+.wday.future.pickable{opacity:1}
+.wday.pickable .wd-label::after{content:"\270E";font-size:9px;color:var(--accent);font-style:normal}
 </style>
 </head>
 <body>
@@ -284,6 +355,7 @@ main{
       <p class="note">清除浏览器数据或卸载应用会导致记录丢失。</p>
       <p class="note">每天的任务由你自己填写，四个板块独立记录。</p>
       <p class="note">点击任务文字可修改内容，点击左侧圆圈切换完成状态。</p>
+      <p class="note">长按任务：可设为本周每天重复，或进入拖动调整顺序。</p>
     </div>
     <div class="card">
       <p class="card-sub">数据备份</p>
@@ -297,7 +369,7 @@ main{
     <div class="card" style="padding:14px">
       <button class="btn danger" id="clearBtn" type="button">清空全部数据</button>
     </div>
-    <p class="hint">每日任务 · v3.1</p>
+    <p class="hint">每日任务 · v4.0</p>
   </section>
 </main>
 
@@ -308,6 +380,29 @@ main{
 </nav>
 
 <div class="toast" id="toast"></div>
+
+<div class="sheet-mask" id="sheetMask"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-title" id="sheetTitle"></div>
+  <button id="sheetRepeat" type="button">📅 设为本周每天</button>
+  <button id="sheetSort" type="button">⇕ 移动位置</button>
+  <hr>
+  <button id="sheetCancel" type="button" class="muted">取消</button>
+</div>
+
+<div class="modal-mask" id="modalMask"></div>
+<div class="modal" id="dayModal">
+  <div class="modal-head">
+    <div class="modal-title" id="modalTitle"></div>
+    <button class="modal-close" id="modalClose" type="button">完成</button>
+  </div>
+  <div id="modalBody"></div>
+</div>
+
+<div class="sort-banner" id="sortBanner">
+  <span>按住任务上下拖动调整顺序</span>
+  <button id="sortDone" type="button">完成</button>
+</div>
 
 <script>
 // PWA：注册离线缓存 + iOS「添加到主屏幕」引导
@@ -528,13 +623,13 @@ main{
 
     catList.innerHTML = '';
     CATS.forEach(function (cat) {
-      catList.appendChild(buildCatCard(cat, day));
+      catList.appendChild(buildCatCard(cat, day, key, catList));
     });
 
     renderYesterday();
   }
 
-  function buildCatCard(cat, day) {
+  function buildCatCard(cat, day, key, container) {
     var items = day[cat.id] || [];
     var done = 0;
     items.forEach(function (t) { if (t.done) done++; });
@@ -580,7 +675,7 @@ main{
         check.className = 'check';
         check.addEventListener('click', function (e) {
           e.stopPropagation();
-          toggleTask(cat.id, i);
+          toggleTask(cat.id, i, key);
         });
 
         var txt = document.createElement('span');
@@ -588,7 +683,7 @@ main{
         txt.textContent = t.text;
         txt.addEventListener('click', function (e) {
           e.stopPropagation();
-          startEdit(cat.id, i, txt);
+          startEdit(cat.id, i, txt, key);
         });
 
         var del = document.createElement('button');
@@ -598,12 +693,13 @@ main{
         del.setAttribute('aria-label', '删除任务');
         del.addEventListener('click', function (e) {
           e.stopPropagation();
-          removeTask(cat.id, i);
+          removeTask(cat.id, i, key);
         });
 
         li.appendChild(check);
         li.appendChild(txt);
         li.appendChild(del);
+        attachGestures(li, cat, key, i);
         ul.appendChild(li);
       });
     }
@@ -645,7 +741,7 @@ main{
     function submit() {
       var v = input.value.trim();
       if (!v) { input.focus(); return; }
-      addTask(cat.id, v);
+      addTask(cat.id, v, key, sec);
     }
 
     okBtn.addEventListener('click', submit);
@@ -659,17 +755,15 @@ main{
     return sec;
   }
 
-  function startEdit(catId, i, textEl) {
-    var key = dayKey(new Date());
+  function startEdit(catId, i, textEl, key) {
     var day = getDayData(key, false);
     if (!day || !day[catId] || !day[catId][i]) return;
     var task = day[catId][i];
-    var oldText = task.text;
 
     var input = document.createElement('input');
     input.type = 'text';
     input.className = 'edit-input';
-    input.value = oldText;
+    input.value = task.text;
     input.maxLength = 60;
 
     var cancelled = false;
@@ -685,13 +779,13 @@ main{
       var v = input.value.trim();
       if (v) task.text = v;
       save();
-      renderToday();
+      refresh(key);
     }
 
     function cancelEdit() {
       if (finished || cancelled) return;
       cancelled = true;
-      renderToday();
+      refresh(key);
     }
 
     input.addEventListener('keydown', function (e) {
@@ -769,14 +863,13 @@ main{
     }
   }
 
-  function addTask(catId, text) {
-    var key = dayKey(new Date());
+  function addTask(catId, text, key, sec) {
     var d = ensureDay(key);
     d[catId].push({ text: text, done: false });
     save();
-    renderToday();
+    refresh(key);
 
-    var sec = catList.querySelector('.cat-card[data-cat="' + catId + '"]');
+    sec = sec || catList.querySelector('.cat-card[data-cat="' + catId + '"]');
     if (sec) {
       var btn = sec.querySelector('.add-btn');
       var form = sec.querySelector('.add-form');
@@ -789,8 +882,7 @@ main{
     }
   }
 
-  function toggleTask(catId, i) {
-    var key = dayKey(new Date());
+  function toggleTask(catId, i, key) {
     var d = getDayData(key, false);
     if (!d || !d[catId] || !d[catId][i]) return;
 
@@ -800,23 +892,246 @@ main{
 
     if (d[catId][i].done) vibrate(12);
 
-    renderToday();
+    refresh(key);
 
     var after = dayStats(d);
-    if (after.total && after.done === after.total && before.done !== before.total) {
+    if (key === dayKey(new Date()) && after.total && after.done === after.total && before.done !== before.total) {
       toast('🎉 今日任务全部完成！');
       vibrate([20, 60, 20]);
     }
   }
 
-  function removeTask(catId, i) {
-    var key = dayKey(new Date());
+  function removeTask(catId, i, key) {
     var d = getDayData(key, false);
     if (!d || !d[catId] || !d[catId][i]) return;
     d[catId].splice(i, 1);
     save();
-    renderToday();
+    refresh(key);
   }
+
+  function refresh(key) {
+    if (key === dayKey(new Date())) renderToday();
+    else if (modalKey === key) renderModal(key);
+  }
+
+  // ---- 长按操作菜单 ----
+  var sheetEl = document.getElementById('sheet');
+  var sheetMask = document.getElementById('sheetMask');
+  var sheetCtx = null;
+
+  function openSheet(cat, key, i) {
+    var d = getDayData(key, false);
+    var t = d && d[cat.id] && d[cat.id][i];
+    if (!t) return;
+    sheetCtx = { cat: cat, key: key, i: i };
+    document.getElementById('sheetTitle').textContent = t.text;
+    sheetEl.classList.add('show');
+    sheetMask.classList.add('show');
+  }
+
+  function closeSheet() {
+    sheetEl.classList.remove('show');
+    sheetMask.classList.remove('show');
+    sheetCtx = null;
+  }
+
+  function attachGestures(li, cat, key, i) {
+    var timer = null, sx = 0, sy = 0, fired = false;
+
+    li.addEventListener('pointerdown', function (e) {
+      if (sortMode) { beginDrag(e, li, cat, key, i); return; }
+      if (e.button && e.button !== 0) return;
+      fired = false; sx = e.clientX; sy = e.clientY;
+      timer = setTimeout(function () {
+        fired = true;
+        vibrate(20);
+        openSheet(cat, key, i);
+      }, 480);
+    });
+    li.addEventListener('pointermove', function (e) {
+      if (timer && !fired) {
+        var dx = e.clientX - sx, dy = e.clientY - sy;
+        if (dx * dx + dy * dy > 144) { clearTimeout(timer); timer = null; }
+      }
+    });
+    function cancel() { if (timer) { clearTimeout(timer); timer = null; } }
+    li.addEventListener('pointerup', cancel);
+    li.addEventListener('pointercancel', cancel);
+    li.addEventListener('pointerleave', function () { if (!fired) cancel(); });
+
+    // 长按呼出菜单后吞掉随后的 click，避免误触勾选/编辑
+    li.addEventListener('click', function (e) {
+      if (fired) { fired = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
+
+    // 桌面右键同样呼出
+    li.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      openSheet(cat, key, i);
+    });
+  }
+
+  document.getElementById('sheetRepeat').addEventListener('click', function () {
+    if (!sheetCtx) return;
+    repeatWeekly(sheetCtx.cat, sheetCtx.key, sheetCtx.i);
+    closeSheet();
+  });
+  document.getElementById('sheetSort').addEventListener('click', function () {
+    if (!sheetCtx) return;
+    var ctx = sheetCtx;
+    closeSheet();
+    if (ctx.key !== dayKey(new Date())) {
+      toast('只能在「今日」页面调整顺序');
+      return;
+    }
+    enterSortMode();
+  });
+  document.getElementById('sheetCancel').addEventListener('click', closeSheet);
+  sheetMask.addEventListener('click', closeSheet);
+
+  function repeatWeekly(cat, key, i) {
+    var d = getDayData(key, false);
+    if (!d || !d[cat.id] || !d[cat.id][i]) return;
+    var task = d[cat.id][i];
+
+    var start = new Date(key + 'T12:00:00');
+    var weekEnd = addDays(startOfWeek(new Date()), 6);
+    if (start > weekEnd) weekEnd = new Date(start);
+    var cur = new Date(start);
+    var count = 0;
+
+    while (cur <= weekEnd) {
+      var k = dayKey(cur);
+      if (k !== key) {
+        var d2 = ensureDay(k);
+        var exists = d2[cat.id].some(function (t) { return t.text === task.text; });
+        if (!exists) {
+          d2[cat.id].push({ text: task.text, done: false });
+          count++;
+        }
+      }
+      cur = addDays(cur, 1);
+    }
+    save();
+    refresh(key);
+    if (currentTab === 'week') renderWeek();
+    toast(count ? '已复制到本周剩余 ' + count + ' 天' : '本周剩余天数都已安排');
+  }
+
+  // ---- 排序模式 ----
+  var sortMode = false;
+  var sortBanner = document.getElementById('sortBanner');
+
+  function enterSortMode() {
+    sortMode = true;
+    document.body.classList.add('sorting');
+    sortBanner.classList.add('show');
+  }
+  function exitSortMode() {
+    sortMode = false;
+    document.body.classList.remove('sorting');
+    sortBanner.classList.remove('show');
+  }
+  document.getElementById('sortDone').addEventListener('click', exitSortMode);
+
+  function beginDrag(e, li, cat, key, i) {
+    e.preventDefault();
+    var dayData = getDayData(key, false);
+    var arr = dayData && dayData[cat.id];
+    if (!arr) return;
+
+    var shown = arr.map(function (t, idx) { return { t: t, i: idx }; })
+      .sort(function (a, b) { return (a.t.done ? 1 : 0) - (b.t.done ? 1 : 0); });
+    var pos = -1;
+    for (var s = 0; s < shown.length; s++) {
+      if (shown[s].i === i) { pos = s; break; }
+    }
+    if (pos < 0) return;
+
+    var undoneCount = 0;
+    shown.forEach(function (o) { if (!o.t.done) undoneCount++; });
+    var lo = shown[pos].t.done ? undoneCount : 0;
+    var hi = shown[pos].t.done ? shown.length - 1 : undoneCount - 1;
+
+    var ul = li.parentNode;
+    var lis = Array.prototype.slice.call(ul.querySelectorAll('.task'));
+    var rowH = li.offsetHeight + 7;
+    var startY = e.clientY;
+    var target = pos;
+
+    li.classList.add('dragging');
+    try { li.setPointerCapture(e.pointerId); } catch (err) {}
+
+    function onMove(ev) {
+      var dy = ev.clientY - startY;
+      li.style.transform = 'translateY(' + dy + 'px)';
+      var t = Math.max(lo, Math.min(hi, pos + Math.round(dy / rowH)));
+      if (t !== target) {
+        target = t;
+        lis.forEach(function (el, idx) {
+          if (el === li) return;
+          var shift = 0;
+          if (pos < target && idx > pos && idx <= target) shift = -rowH;
+          else if (pos > target && idx >= target && idx < pos) shift = rowH;
+          el.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+        });
+      }
+    }
+    function onUp() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (target !== pos) {
+        var moved = shown.splice(pos, 1)[0];
+        shown.splice(target, 0, moved);
+        var undoneIdx = [], doneIdx = [];
+        for (var q = 0; q < arr.length; q++) {
+          (arr[q].done ? doneIdx : undoneIdx).push(q);
+        }
+        var ui = 0, di = 0;
+        shown.forEach(function (o) {
+          if (o.t.done) arr[doneIdx[di++]] = o.t;
+          else arr[undoneIdx[ui++]] = o.t;
+        });
+        save();
+        vibrate(10);
+      }
+      renderToday();
+    }
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
+
+  // ---- 周报：点击日期提前编辑 ----
+  var modalKey = null;
+
+  function openModal(key) {
+    modalKey = key;
+    var d = new Date(key + 'T12:00:00');
+    document.getElementById('modalTitle').textContent =
+      fmtDateWeek(d) + (key === dayKey(new Date()) ? ' · 今天' : '');
+    renderModal(key);
+    document.getElementById('dayModal').classList.add('show');
+    document.getElementById('modalMask').classList.add('show');
+  }
+
+  function renderModal(key) {
+    var day = getDayData(key, false) || emptyDay();
+    var body = document.getElementById('modalBody');
+    body.innerHTML = '';
+    CATS.forEach(function (cat) {
+      body.appendChild(buildCatCard(cat, day, key, body));
+    });
+  }
+
+  function closeModal() {
+    document.getElementById('dayModal').classList.remove('show');
+    document.getElementById('modalMask').classList.remove('show');
+    modalKey = null;
+    renderToday();
+    if (currentTab === 'week') renderWeek();
+  }
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('modalMask').addEventListener('click', closeModal);
 
   function renderWeek() {
     var today = new Date();
@@ -884,8 +1199,9 @@ main{
       var isToday = k === dayKey(today);
       var isFuture = d > today;
       var ringColor = (s.total && p === 100) ? '#4ade80' : '#60a5fa';
+      var pickable = d >= today;
 
-      html += '<div class="wday' + (isToday ? ' today' : '') + (isFuture ? ' future' : '') + '">';
+      html += '<div class="wday' + (isToday ? ' today' : '') + (isFuture ? ' future' : '') + (pickable ? ' pickable' : '') + '" data-date="' + k + '"' + (pickable ? ' role="button" tabindex="0"' : '') + '>';
       html += '<div class="wd-label">' + WEEK_CN[d.getDay()] + '</div>';
       html += '<div class="ring" style="--p:' + p + ';--c:' + ringColor + '">';
       html += '<span>' + (s.total ? p + '%' : '—') + '</span>';
@@ -893,7 +1209,7 @@ main{
       html += '<div class="wd-num">' + (s.total ? s.done + '/' + s.total : '') + '</div>';
       html += '</div>';
     }
-    html += '</div></div>';
+    html += '</div><div class="cmp-note">点今天及以后的日期，可提前添加任务</div></div>';
 
     html += '<div class="card">';
     html += '<div class="card-sub">最近 4 周</div>';
@@ -913,6 +1229,10 @@ main{
     html += '</div>';
 
     weekContent.innerHTML = html;
+
+    weekContent.querySelectorAll('.wday.pickable').forEach(function (wd) {
+      wd.addEventListener('click', function () { openModal(wd.dataset.date); });
+    });
   }
 
   document.querySelectorAll('.tabbar button').forEach(function (btn) {
@@ -937,6 +1257,7 @@ main{
 
   document.getElementById('clearBtn').addEventListener('click', function () {
     if (confirm('确定清空全部任务和记录？此操作不可恢复。')) {
+      closeModal();
       state = { days: {} };
       save();
       yesterdayOpen = false;
